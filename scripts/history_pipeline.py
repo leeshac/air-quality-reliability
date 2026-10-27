@@ -65,8 +65,14 @@ def fetch_historical_data(active_sites):
             print(f"Saved {filepath}")
     return
 
-def transform_historical_data():
+def transform_historical_data(active_sites):
     #Get every file in data/api-data/raw and for each file, extract the relevant columns, set types and keep nulls.
+    
+    #Get the list of sites from the active_sites dictionary
+    sites = active_sites['Sites']['Site']
+    #Map site codes to site names for later use
+    site_names = {site['@SiteCode']: site['@SiteName'] for site in sites}
+
     #Records will hold the extracted data from all JSON files
     records = []
 
@@ -89,7 +95,7 @@ def transform_historical_data():
                 "site_code": air_quality_data.get("@SiteCode"),
                 "timestamp": record.get("@MeasurementDateGMT"),
                 "species": record.get("@SpeciesCode"),
-                "measurement": record.get("@Value")
+                "measurement": record.get("@Value"),
             })
 
     #Then combine all the extracted data into a single DataFrame for further processing
@@ -97,6 +103,7 @@ def transform_historical_data():
 
     #Set the appropriate data types for the columns
     df["timestamp"] = pd.to_datetime(df["timestamp"])
+    #For measurement column, convert to numeric, keep NaN for invalid values
     df["measurement"] = pd.to_numeric(df["measurement"], errors="coerce")
     df["site_code"] = df["site_code"].astype(str)
     df["species"] = df["species"].astype(str)
@@ -106,6 +113,9 @@ def transform_historical_data():
     df["available"] = df["measurement"].notna()
     #Date is the date without time, for example 2026-01-27 10:00:00	becomes 2026-01-27
     df["date"] = df["timestamp"].dt.date
+
+    #Create a column for site names based on the site_code
+    df["site_name"] = df["site_code"].map(site_names)
 
     #SITE
     #Site expected daily column is the total count of measurements taken on that day for each site, grouping by site and date and counting the number of measurements
@@ -119,56 +129,58 @@ def transform_historical_data():
 
     #SPECIES
     #Species expected daily column is the total count of measurements taken on that day for each species, grouping by species and date and counting the number of measurements
-    df["species_expected_daily"] = df.groupby(["site_code","species", "date"])["measurement"].transform("size")
+    df["species_expected_daily"] = df.groupby(["site_code", "species", "date"])["measurement"].transform("size")
 
     #Species available daily column is the total count of present measurements for each species on that day, grouping by species and date and summing the available measurements
-    df["species_available_daily"] = df.groupby(["site_code","species", "date"])["available"].transform("sum")
+    df["species_available_daily"] = df.groupby(["site_code", "species", "date"])["available"].transform("sum")
 
     #Species reliability daily column is the percentage of available measurements out of expected measurements for each species on that day
     df["species_reliability_daily"] = (df["species_available_daily"] / df["species_expected_daily"]) * 100
+
+    print(df.head())
 
     return df
 
 def load_historical_data(df):
     #Load the tranformed df to DuckDB, connect to air_quality.db in data/db
-    conn = duckdb.connect(database='data/db/air_quality.db')   
+    conn = duckdb.connect(database='data/db/air_quality.db')
+    #Register df as a table, making it available for SQL queries
+    conn.register("historical_df", df)
 
-    #Insert only new sites into the site table
+    #Insert only unique sites into the site table
     conn.execute('''
         INSERT INTO sites (site_code, site_name)
         SELECT DISTINCT site_code, site_name
-        FROM df
+        FROM historical_df AS df
         ON CONFLICT (site_code) DO NOTHING
     ''')
 
-    #Match site_code in df to sites.id and add site_id to df
-    #Create a temp table which will hold the transformed df with site_id added
+    #Insert measurements into the measurements table, linking to the correct site_id on the sites table
     conn.execute('''
-        CREATE TEMP TABLE temp_df AS SELECT * FROM df
-    ''')
-    #Then update the temp table to set the site_id based on the matching site_code in the sites table
-    conn.execute('''
-        UPDATE temp_df
-        SET site_id = (SELECT id FROM sites WHERE sites.site_code = temp_df.site_code)
-    ''')
-    #Fetch the updated temp table back into df
-    df = conn.execute('SELECT * FROM temp_df').fetchdf()
-
-    #Insert the transformed data with site_id into measurements table
-    conn.execute('''
-        INSERT INTO measurements (site_id, timestamp, species, measurement, available, date, site_expected_daily, site_available_daily, site_reliability_daily, species_expected_daily, species_available_daily, species_reliability_daily)
-        SELECT site_id, timestamp, species, measurement, available, date, site_expected_daily, site_available_daily, site_reliability_daily, species_expected_daily, species_available_daily, species_reliability_daily
-        FROM df
+        INSERT INTO measurements (
+            site_id, timestamp, species, measurement, available, date,
+            site_expected_daily, site_available_daily, site_reliability_daily,
+            species_expected_daily, species_available_daily,
+            species_reliability_daily
+        )
+        SELECT
+            s.id, df.timestamp, df.species, df.measurement, df.available,
+            df.date, df.site_expected_daily, df.site_available_daily,
+            df.site_reliability_daily, df.species_expected_daily,
+            df.species_available_daily, df.species_reliability_daily
+        FROM historical_df AS df
+        JOIN sites AS s ON s.site_code = df.site_code
     ''')
 
     conn.close()
+    return
 
 def main():
 
     active_sites = fetch_sites()
     fetch_historical_data(active_sites)
 
-    df = transform_historical_data()
+    df = transform_historical_data(active_sites)
     load_historical_data(df)
 
 if __name__ == "__main__":
