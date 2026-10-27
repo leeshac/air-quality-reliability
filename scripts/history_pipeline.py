@@ -1,6 +1,8 @@
 #TODO
 #Pipeline that collects the historical data from the Air Quality Network API and stores it in a database.
 
+from urllib import response
+
 import requests
 import pandas as pd
 import calendar
@@ -14,7 +16,7 @@ def fetch_sites():
     base_url = "https://api.erg.ic.ac.uk/AirQuality"
     url = (f"{base_url}/Information/MonitoringSites/GroupName=London/Json")
     
-    response = requests.get(url, timeout=10)
+    response = requests.get(url, timeout=120)
     sites_data = response.json()
 
     #From sites_data, only keep the sites that are still active, i.e. where '@DateClosed' is an empty field.
@@ -32,9 +34,18 @@ def fetch_historical_data(active_sites):
     #Save with the site code as the filename, e.g. data/api-data/raw/2026-01/TH1.json for site TH1 in january 2026.
     #Once one site has been collected from january to september 2026, move on to the next site, starting again from january 2026.
     base_url = "https://api.erg.ic.ac.uk/AirQuality"
+    resume = False
 
     for a in active_sites:
         code = active_sites[a]['@SiteCode']
+
+        if code == "AZ99":
+            resume = True
+
+        if not resume:
+            print(f"Skipping Site {code}")
+            continue
+        
         print(f"Fetching Site {code}")
 
         for month in range(1,10):
@@ -52,8 +63,13 @@ def fetch_historical_data(active_sites):
             end = end.isoformat()
 
             second_url = (f"{base_url}/Data/Site/SiteCode={code}/StartDate={start}/EndDate={end}/Json")
-            response = requests.get(second_url, timeout=10)
-            response.raise_for_status()
+            
+            try:
+                response = requests.get(second_url, timeout=120)
+                response.raise_for_status()
+            except requests.exceptions.HTTPError as e:
+                print(f"Failed: {code}, {start} to {end}: {e}")
+                continue
 
             #Create the month folder if not already there, 02d always ensures the month is diplayed as two digit.
             folderloc = Path("data/api-data/raw") / f"{year}-{month:02d}"
@@ -68,10 +84,8 @@ def fetch_historical_data(active_sites):
 def transform_historical_data(active_sites):
     #Get every file in data/api-data/raw and for each file, extract the relevant columns, set types and keep nulls.
     
-    #Get the list of sites from the active_sites dictionary
-    sites = active_sites['Sites']['Site']
     #Map site codes to site names for later use
-    site_names = {site['@SiteCode']: site['@SiteName'] for site in sites}
+    site_names = {site['@SiteCode']: site['@SiteName'] for site in active_sites.values()}
 
     #Records will hold the extracted data from all JSON files
     records = []
@@ -137,7 +151,7 @@ def transform_historical_data(active_sites):
     #Species reliability daily column is the percentage of available measurements out of expected measurements for each species on that day
     df["species_reliability_daily"] = (df["species_available_daily"] / df["species_expected_daily"]) * 100
 
-    print(df.head())
+    print(df.head(200))
 
     return df
 
@@ -173,15 +187,18 @@ def load_historical_data(df):
     ''')
 
     conn.close()
+    print("Historical data loaded successfully.")
+
     return
 
 def main():
 
     active_sites = fetch_sites()
-    fetch_historical_data(active_sites)
+    #fetch_historical_data(active_sites)
 
     df = transform_historical_data(active_sites)
     load_historical_data(df)
+    print("Historical data transformation and loading complete.")
 
 if __name__ == "__main__":
     main()
