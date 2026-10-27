@@ -17,7 +17,7 @@ def create_database():
     conn.execute('''
         CREATE TABLE IF NOT EXISTS sites (
             id INTEGER PRIMARY KEY DEFAULT nextval('sites_id_seq'),
-            site_code TEXT,
+            site_code TEXT UNIQUE,
             site_name TEXT
         )
     ''')
