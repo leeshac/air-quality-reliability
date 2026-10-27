@@ -34,8 +34,8 @@ def fetch_historical_data(active_sites):
     base_url = "https://api.erg.ic.ac.uk/AirQuality"
 
     for a in active_sites:
-        print(f"Fetching Site {code}")
         code = active_sites[a]['@SiteCode']
+        print(f"Fetching Site {code}")
 
         for month in range(1,10):
             year = 2026
