@@ -194,6 +194,8 @@ def load_historical_data(df):
 def main():
 
     active_sites = fetch_sites()
+
+    #Commented out fetching historical data as it is already available in data/api-data/raw
     #fetch_historical_data(active_sites)
 
     df = transform_historical_data(active_sites)
