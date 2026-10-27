@@ -9,10 +9,14 @@ def create_database():
     fileloc = 'data/db'
     conn = duckdb.connect(f'{fileloc}/air_quality.db')
 
+    #Create sequences for sites and measurements tables so that the id columns can auto-increment
+    conn.execute("CREATE SEQUENCE IF NOT EXISTS sites_id_seq START 1")
+    conn.execute("CREATE SEQUENCE IF NOT EXISTS measurements_id_seq START 1")
+
     #Create the sites table with columns for site_id, site_code and site_name
     conn.execute('''
         CREATE TABLE IF NOT EXISTS sites (
-            id INTEGER PRIMARY KEY,
+            id INTEGER PRIMARY KEY DEFAULT nextval('sites_id_seq'),
             site_code TEXT,
             site_name TEXT
         )
@@ -24,7 +28,7 @@ def create_database():
     #species_reliability_daily
     conn.execute('''
         CREATE TABLE IF NOT EXISTS measurements (
-            id INTEGER PRIMARY KEY,
+            id INTEGER PRIMARY KEY DEFAULT nextval('measurements_id_seq'),
             site_id INTEGER,
             timestamp TIMESTAMP,
             species TEXT,

@@ -133,7 +133,33 @@ def load_historical_data(df):
     #Load the tranformed df to DuckDB, connect to air_quality.db in data/db
     conn = duckdb.connect(database='data/db/air_quality.db')   
 
-    #Insert the transformed data into the measurements table and the sites table 
+    #Insert only new sites into the site table
+    conn.execute('''
+        INSERT INTO sites (site_code, site_name)
+        SELECT DISTINCT site_code, site_name
+        FROM df
+        ON CONFLICT (site_code) DO NOTHING
+    ''')
+
+    #Match site_code in df to sites.id and add site_id to df
+    #Create a temp table which will hold the transformed df with site_id added
+    conn.execute('''
+        CREATE TEMP TABLE temp_df AS SELECT * FROM df
+    ''')
+    #Then update the temp table to set the site_id based on the matching site_code in the sites table
+    conn.execute('''
+        UPDATE temp_df
+        SET site_id = (SELECT id FROM sites WHERE sites.site_code = temp_df.site_code)
+    ''')
+    #Fetch the updated temp table back into df
+    df = conn.execute('SELECT * FROM temp_df').fetchdf()
+
+    #Insert the transformed data with site_id into measurements table
+    conn.execute('''
+        INSERT INTO measurements (site_id, timestamp, species, measurement, available, date, site_expected_daily, site_available_daily, site_reliability_daily, species_expected_daily, species_available_daily, species_reliability_daily)
+        SELECT site_id, timestamp, species, measurement, available, date, site_expected_daily, site_available_daily, site_reliability_daily, species_expected_daily, species_available_daily, species_reliability_daily
+        FROM df
+    ''')
 
     conn.close()
 
