@@ -12,6 +12,7 @@ def create_database():
     #Create sequences for sites and measurements tables so that the id columns can auto-increment
     conn.execute("CREATE SEQUENCE IF NOT EXISTS sites_id_seq START 1")
     conn.execute("CREATE SEQUENCE IF NOT EXISTS measurements_id_seq START 1")
+    conn.execute("CREATE SEQUENCE IF NOT EXISTS forecasts_id_seq START 1")
 
     #Create the sites table with columns for site_id, site_code and site_name
     conn.execute('''
@@ -41,6 +42,19 @@ def create_database():
             species_expected_daily REAL,
             species_available_daily REAL,
             species_reliability_daily REAL,
+            FOREIGN KEY (site_id) REFERENCES sites(id)
+        )
+    ''')
+
+    #Create a table for storing the forecasts for each site. One column for forecast for tomorrow and one for the average predicted reliability over the next seven days
+    #Joined by the site_id to the sites table
+    conn.execute('''
+        CREATE TABLE IF NOT EXISTS forecasts (
+            id INTEGER PRIMARY KEY DEFAULT nextval('forecasts_id_seq'),
+            site_id INTEGER,
+            forecast_made_on DATE,
+            forecast_tomorrow REAL,
+            forecast_next_seven_days_mean REAL,
             FOREIGN KEY (site_id) REFERENCES sites(id)
         )
     ''')
