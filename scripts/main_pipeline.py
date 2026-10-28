@@ -175,6 +175,7 @@ def main():
     fetch_data(active_sites)
     df = transform_data(active_sites)
     load_data(df)
+    #TODO: Test the pipeline
 
 if __name__ == "__main__":
     main()
