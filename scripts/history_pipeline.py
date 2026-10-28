@@ -2,7 +2,6 @@
 #Pipeline that collects the historical data from the Air Quality Network API and stores it in a database.
 
 from urllib import response
-
 import requests
 import pandas as pd
 import calendar
