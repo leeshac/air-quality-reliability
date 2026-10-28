@@ -1,9 +1,9 @@
-#TODO
 #This script would be run daily, generating the predictions for site reliability based on the latest measurements in the database
 
 import datetime
 import pandas as pd
 import duckdb
+from xgboost import XGBRegressor
 
 def fetch_latest_data():
     #Fetch the last 8 days of data from duckdb database
@@ -77,22 +77,82 @@ def transform_data(latest_df):
     return main_df
 
 def forecast_day(main_df):
-    pass
+    #Forecast the reliability for the next day based on the main_df using XGBoost model
+    folderloc = "data/models/current"
+    day_model = XGBRegressor()
+    day_model.load_model(f"{folderloc}/xgboost_model_forecast_day.json")
 
-def forecast_week(main_df):
-    pass
+    #Define the features and target for the forecast model
+    features = ["site_code","day_of_the_week","site_reliability_lag_1",
+                "site_reliability_lag_2","site_reliability_lag_3",
+                "site_reliability_rolling_mean_7","site_expected_daily_lag_1",
+                "site_available_daily_lag_1"]
+    target = "target_forecast_day"
 
-def load_data(week_forecast, day_forecast):
-    pass
+    #Create a copy of the main_df so it avoids modifying the original DataFrame
+    forecast_df = main_df.copy()
+
+    #Add column for the forecasted target for the next day
+    forecast_df["target_forecast_day"] = day_model.predict(forecast_df[features])
+
+    print(forecast_df.head(10))
+
+    return forecast_df
+
+def forecast_week(forecast_df, main_df):
+    #Forecast the reliability for the next week based on the main_df using XGBoost model
+    folderloc = "data/models/current"
+    week_model = XGBRegressor()
+    week_model.load_model(f"{folderloc}/xgboost_model_forecast_week.json")
+
+    features = ["site_code","day_of_the_week","site_reliability_lag_1",
+                "site_reliability_lag_2","site_reliability_lag_3",
+                "site_reliability_rolling_mean_7","site_expected_daily_lag_1",
+                "site_available_daily_lag_1"]
+    target = "target_forecast_week"
+
+    #Add column for the forecasted target for the next week
+    forecast_df["target_forecast_week"] = week_model.predict(forecast_df[features])
+
+    print(forecast_df.head(10))
+
+    return forecast_df
+
+def load_data(forecast_df):
+    #Load the forecasted data into the DuckDB forecasts table
+    fileloc = 'data/db'
+    conn = duckdb.connect(f'{fileloc}/air_quality.db')
+
+    conn.register("forecast_df", forecast_df)
+
+    #Insert the forecasted data into the forecasts table and join with the sites table to get the site_id
+    conn.execute('''
+        INSERT INTO forecasts (site_id, forecast_made_on, forecast_tomorrow, forecast_next_seven_days_mean)
+        SELECT s.id, CURRENT_DATE, forecast_df.target_forecast_day, forecast_df.target_forecast_week
+        FROM forecast_df forecast_df
+        JOIN sites s ON forecast_df.site_code = s.site_code
+    ''')
+
+    #Remove rows that fall before the current date from the forecasts table
+    conn.execute('''
+        DELETE FROM forecasts
+        WHERE forecast_made_on < CURRENT_DATE
+    ''')
+
+    conn.close()
+    return
 
 def main():
+    #Fetch the latest data and transform it for forecasting
     latest_df = fetch_latest_data()
     main_df = transform_data(latest_df)
 
-    day_forecast = forecast_day(main_df)
-    week_forecast = forecast_week(main_df)
+    #Forecast the reliability for the next day and the next week using the transformed data
+    forecast_df = forecast_day(main_df)
+    forecast_df = forecast_week(forecast_df, main_df)
 
-    load_data(week_forecast, day_forecast)
+    #Load the forecasted data into the DuckDB forecasts table
+    load_data(forecast_df)
 
 if __name__ == "__main__":
     main()
