@@ -1,5 +1,7 @@
 #Script to create the database and tables for the application
 
+#TODO: Add another column in measurements for average predicted reliability over the next seven days
+#TODO: Update the current measurements table to populate this column with the engineered values for the current rows in the DuckDB database
 import duckdb
 
 def create_database():
