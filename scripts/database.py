@@ -42,7 +42,8 @@ def create_database():
             species_expected_daily REAL,
             species_available_daily REAL,
             species_reliability_daily REAL,
-            FOREIGN KEY (site_id) REFERENCES sites(id)
+            FOREIGN KEY (site_id) REFERENCES sites(id),
+            UNIQUE (site_id, timestamp, species, measurement),
         )
     ''')
 

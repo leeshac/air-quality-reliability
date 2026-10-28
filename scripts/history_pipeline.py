@@ -120,6 +120,9 @@ def transform_historical_data(active_sites):
     df["site_code"] = df["site_code"].astype(str)
     df["species"] = df["species"].astype(str)
 
+    #Drop duplicate rows based on site_code, timestamp, species, and measurement
+    df = df.drop_duplicates(subset=["site_code", "timestamp", "species", "measurement"])
+
     #Engineer the following columns: available, date, site_expected_daily, site_available_daily, site_reliability_daily, species_expected_daily, species_available_daily, species_reliability_daily
     #Available column is a 0/False if measurement is missing and 1/True if measurement is present
     df["available"] = df["measurement"].notna()
