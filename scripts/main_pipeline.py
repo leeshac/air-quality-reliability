@@ -197,6 +197,7 @@ def load_data(df):
     print(f"Rows in yesterday's data: {len(df)}")
     print(f"New rows added to the database: {len(new_rows)}")
     print(f"Duplicates skipped: {len(df) - len(new_rows)}")
+    print(new_rows[['site_id', 'timestamp', 'species', 'measurement']])
     
     conn.close()
     print("Historical data loaded successfully.")

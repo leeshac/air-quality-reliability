@@ -83,7 +83,7 @@ def transform_data(latest_df):
 
 def forecast_day(main_df):
     #Forecast the reliability for the next day based on the main_df using XGBoost model
-    folderloc = "data/models/current"
+    folderloc = "models/current"
     day_model = XGBRegressor()
     day_model.load_model(f"{folderloc}/xgboost_model_forecast_day.json")
 
@@ -109,7 +109,7 @@ def forecast_day(main_df):
 
 def forecast_week(forecast_df, main_df):
     #Forecast the reliability for the next week based on the main_df using XGBoost model
-    folderloc = "data/models/current"
+    folderloc = "models/current"
     week_model = XGBRegressor()
     week_model.load_model(f"{folderloc}/xgboost_model_forecast_week.json")
 
