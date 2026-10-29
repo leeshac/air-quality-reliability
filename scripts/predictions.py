@@ -14,6 +14,7 @@ def fetch_latest_data():
     start_date = today - datetime.timedelta(days=8)
     end_date = today - datetime.timedelta(days=1)
 
+
     conn = duckdb.connect(f'{folderloc}/air_quality.db')
 
     #Fetch the latest data for the last 8 days from the measurements table and join with site information to get the site code
@@ -93,6 +94,8 @@ def forecast_day(main_df):
                 "site_reliability_rolling_mean_7","site_expected_daily_lag_1",
                 "site_available_daily_lag_1"]
 
+    print(main_df[features].isna().sum())
+
     #Create a copy of the main_df so it avoids modifying the original DataFrame
     forecast_df = main_df.copy()
 
@@ -133,6 +136,13 @@ def load_data(forecast_df):
     #Load the forecasted data into the DuckDB forecasts table
     fileloc = 'data/db'
     conn = duckdb.connect(f'{fileloc}/air_quality.db')
+
+    print(conn.execute("""
+    SELECT date, COUNT(*) AS rows
+    FROM measurements
+    GROUP BY date
+    ORDER BY date
+    """).fetchdf().to_string(index=False))
 
     conn.register("forecast_df", forecast_df)
 

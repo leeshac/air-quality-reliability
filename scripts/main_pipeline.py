@@ -110,8 +110,8 @@ def transform_data(active_sites):
     #Date is the date without time, for example 2026-01-27 10:00:00	becomes 2026-01-27
     df["date"] = df["timestamp"].dt.date
 
-    #Filter the data to include only records from the start of the current month
-    df = df[df["date"] == yesterday].copy()
+    #df should only include records from the start of the current month up to yesterday
+    df = df[(df["date"] >= date(yesterday.year, yesterday.month, 1)) & (df["date"] <= yesterday)].copy()
     
     if df.empty:
         print("No records for yesterday, nothing to load.")
@@ -194,7 +194,7 @@ def load_data(df):
     ''')
 
     new_rows = conn.execute("SELECT * FROM measurements WHERE id > ?", [max_id_before]).df()
-    print(f"Rows in yesterday's data: {len(df)}")
+    print(f"Rows in current month's data: {len(df)}")
     print(f"New rows added to the database: {len(new_rows)}")
     print(f"Duplicates skipped: {len(df) - len(new_rows)}")
     print(new_rows[['site_id', 'timestamp', 'species', 'measurement']])
