@@ -27,8 +27,6 @@ def fetch_latest_data():
 
     conn.close()
 
-    print(latest_df.head(10))
-
     return latest_df
 
 def transform_data(latest_df):
@@ -78,8 +76,6 @@ def transform_data(latest_df):
     yesterday = pd.Timestamp(datetime.date.today() - datetime.timedelta(days=1))
     main_df = main_df[main_df["date"] == yesterday].reset_index(drop=True)
 
-    print(main_df.head(10))
-
     return main_df
 
 def forecast_day(main_df):
@@ -94,8 +90,6 @@ def forecast_day(main_df):
                 "site_reliability_rolling_mean_7","site_expected_daily_lag_1",
                 "site_available_daily_lag_1"]
 
-    print(main_df[features].isna().sum())
-
     #Create a copy of the main_df so it avoids modifying the original DataFrame
     forecast_df = main_df.copy()
 
@@ -105,8 +99,6 @@ def forecast_day(main_df):
 
     #Add column for the forecasted target for the next day
     forecast_df["target_forecast_day"] = day_model.predict(X)
-
-    print(forecast_df.head(10))
 
     return forecast_df
 
@@ -136,13 +128,6 @@ def load_data(forecast_df):
     #Load the forecasted data into the DuckDB forecasts table
     fileloc = 'data/db'
     conn = duckdb.connect(f'{fileloc}/air_quality.db')
-
-    print(conn.execute("""
-    SELECT date, COUNT(*) AS rows
-    FROM measurements
-    GROUP BY date
-    ORDER BY date
-    """).fetchdf().to_string(index=False))
 
     conn.register("forecast_df", forecast_df)
 

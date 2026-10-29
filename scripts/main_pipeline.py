@@ -140,7 +140,7 @@ def transform_data(active_sites):
     #Species reliability daily column is the percentage of available measurements out of expected measurements for each species on that day
     df["species_reliability_daily"] = (df["species_available_daily"] / df["species_expected_daily"]) * 100
     
-    print(df.head(200))
+    print(df.head(10))
     
     return df
 
