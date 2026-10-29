@@ -1,5 +1,4 @@
 #This script would be run daily, generating the predictions for site reliability based on the latest measurements in the database
-
 import datetime
 import pandas as pd
 import duckdb
@@ -13,18 +12,16 @@ def fetch_latest_data():
     #Define the start and end dates for the last 8 days of data
     start_date = today - datetime.timedelta(days=8)
     end_date = today - datetime.timedelta(days=1)
-
+    sql = "scripts/sql/predictions_fetch_latest_data.sql"
 
     conn = duckdb.connect(f'{folderloc}/air_quality.db')
 
-    #Fetch the latest data for the last 8 days from the measurements table and join with site information to get the site code
-    latest_df = conn.execute(f"""
-    SELECT s.site_code, m.timestamp, m.measurement
-    FROM measurements AS m
-    JOIN sites AS s ON m.site_id = s.id
-    WHERE m.date >= '{start_date}' AND m.date <= '{end_date}'
-    """).fetchdf()
+    with open(sql, "r") as file:
+        query = file.read()
 
+    #Fetch the latest data for the last 8 days from the measurements table and join with site information to get the site code
+    latest_df = conn.execute(query, [start_date, end_date]).fetchdf()
+    
     conn.close()
 
     return latest_df
@@ -130,26 +127,11 @@ def load_data(forecast_df):
     conn = duckdb.connect(f'{fileloc}/air_quality.db')
 
     conn.register("forecast_df", forecast_df)
+    sql = ("scripts/sql/predictions_load_data.sql")
 
-    #Remove today's and older forecasts first, so a rerun on the same day replaces today's rows
-    conn.execute('''
-        DELETE FROM forecasts
-        WHERE forecast_made_on <= CURRENT_DATE
-    ''')
-
-    #Insert the forecasted data into the forecasts table and join with the sites table to get the site_id
-    conn.execute('''
-        INSERT INTO forecasts (site_id, forecast_made_on, forecast_tomorrow, forecast_next_seven_days_mean)
-        SELECT s.id, CURRENT_DATE, forecast_df.target_forecast_day, forecast_df.target_forecast_week
-        FROM forecast_df forecast_df
-        JOIN sites s ON forecast_df.site_code = s.site_code
-    ''')
-
-    #Remove rows that fall before the current date from the forecasts table
-    conn.execute('''
-        DELETE FROM forecasts
-        WHERE forecast_made_on < CURRENT_DATE
-    ''')
+    #Execute the SQL script to delete existing forecasted data and load the new forecasted data into the database
+    with open(sql, "r") as file:
+        conn.execute(file.read())
 
     conn.close()
     return

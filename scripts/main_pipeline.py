@@ -12,9 +12,14 @@ def fetch_sites():
     base_url = "https://api.erg.ic.ac.uk/AirQuality"
     url = (f"{base_url}/Information/MonitoringSites/GroupName=London/Json")
     
-    response = requests.get(url, timeout=120)
-    sites_data = response.json()
-
+    try:
+        response = requests.get(url, timeout=120)
+        response.raise_for_status()
+        sites_data = response.json()
+    except requests.exceptions.RequestException as e:
+        print(f"Failed to fetch sites: {e}")
+        return {}
+    
     #From sites_data, only keep the sites that are still active, i.e. where '@DateClosed' is an empty field.
     active_sites = {}
 
@@ -148,59 +153,28 @@ def load_data(df):
     #Load the tranformed df to DuckDB, connect to air_quality.db in data/db
     conn = duckdb.connect(database='data/db/air_quality.db')
     #Register df as a table, making it available for SQL queries
-    conn.register("historical_df", df)
+    conn.register("main_df", df)
 
-    #Insert only unique sites into the site table (No duplicates)
-    conn.execute('''
-        INSERT INTO sites (site_code, site_name)
-        SELECT DISTINCT site_code, site_name
-        FROM historical_df AS df
-        ON CONFLICT (site_code) DO NOTHING
-    ''')
+    sites_sql = "scripts/sql/main_pipeline_load_data_sites.sql"
+    measurements_sql = "scripts/sql/main_pipeline_load_data_measurements.sql"
+
+    #Execute the SQL script to insert only unique sites into the site table
+    with open(sites_sql, "r") as file:
+        conn.execute(file.read())
 
     max_id_before = conn.execute("SELECT COALESCE(MAX(id), 0) FROM measurements").fetchone()[0]
-
-    #Insert measurements into the measurements table, linking to the correct site_id on the sites table
-    #Insert new rows only, avoiding duplicates based on site_id and timestamp
-    conn.execute('''
-        INSERT INTO measurements (
-            site_id, timestamp, species, measurement, available, date,
-            site_expected_daily, site_available_daily, site_reliability_daily,
-            species_expected_daily, species_available_daily,
-            species_reliability_daily
-        )
-        SELECT
-            s.id, df.timestamp, df.species, df.measurement, df.available,
-            df.date, df.site_expected_daily, df.site_available_daily,
-            df.site_reliability_daily, df.species_expected_daily,
-            df.species_available_daily, df.species_reliability_daily
-
-        FROM historical_df AS df
-        -- Join with the sites table to get the site_id for each record
-        JOIN sites AS s ON s.site_code = df.site_code
-
-        -- Exclude records that already exist in the measurements table with the same site_id, timestamp, species, and measurement
-        WHERE NOT EXISTS (
-        SELECT 1
-        FROM measurements AS m
-        WHERE m.site_id = s.id
-        AND m.timestamp = df.timestamp
-        AND m.species = df.species
-        -- Compare measurement as REAL to handle potential type differences
-        AND m.measurement IS NOT DISTINCT FROM CAST(df.measurement AS REAL)
-        )
-
-        ON CONFLICT (site_id, timestamp, species, measurement) DO NOTHING
-    ''')
+  
+    #Execute the SQL script to insert new rows into the measurements table, avoiding duplicates
+    with open(measurements_sql, "r") as file:
+        conn.execute(file.read())
 
     new_rows = conn.execute("SELECT * FROM measurements WHERE id > ?", [max_id_before]).df()
     print(f"Rows in current month's data: {len(df)}")
     print(f"New rows added to the database: {len(new_rows)}")
     print(f"Duplicates skipped: {len(df) - len(new_rows)}")
-    print(new_rows[['site_id', 'timestamp', 'species', 'measurement']])
     
     conn.close()
-    print("Historical data loaded successfully.")
+    print("Data loaded successfully.")
     
     return
 

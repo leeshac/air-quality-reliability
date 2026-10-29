@@ -1,5 +1,4 @@
 #Pipeline that collects the historical data from the Air Quality Network API and stores it in a database.
-
 from urllib import response
 import requests
 import pandas as pd
@@ -13,9 +12,14 @@ def fetch_sites():
     #Get site codes from the API
     base_url = "https://api.erg.ic.ac.uk/AirQuality"
     url = (f"{base_url}/Information/MonitoringSites/GroupName=London/Json")
-    
-    response = requests.get(url, timeout=120)
-    sites_data = response.json()
+
+    try:
+        response = requests.get(url, timeout=120)
+        response.raise_for_status()
+        sites_data = response.json()
+    except requests.exceptions.RequestException as e:
+        print(f"Failed to fetch sites: {e}")
+        return {}
 
     #From sites_data, only keep the sites that are still active, i.e. where '@DateClosed' is an empty field.
     active_sites = {}
@@ -65,7 +69,7 @@ def fetch_historical_data(active_sites):
             try:
                 response = requests.get(second_url, timeout=120)
                 response.raise_for_status()
-            except requests.exceptions.HTTPError as e:
+            except requests.exceptions.RequestException as e:
                 print(f"Failed: {code}, {start} to {end}: {e}")
                 continue
 
@@ -162,30 +166,11 @@ def load_historical_data(df):
     #Register df as a table, making it available for SQL queries
     conn.register("historical_df", df)
 
-    #Insert only unique sites into the site table
-    conn.execute('''
-        INSERT INTO sites (site_code, site_name)
-        SELECT DISTINCT site_code, site_name
-        FROM historical_df AS df
-        ON CONFLICT (site_code) DO NOTHING
-    ''')
+    sql = "sql/history_pipeline_load_historical_data.sql"
 
-    #Insert measurements into the measurements table, linking to the correct site_id on the sites table
-    conn.execute('''
-        INSERT INTO measurements (
-            site_id, timestamp, species, measurement, available, date,
-            site_expected_daily, site_available_daily, site_reliability_daily,
-            species_expected_daily, species_available_daily,
-            species_reliability_daily
-        )
-        SELECT
-            s.id, df.timestamp, df.species, df.measurement, df.available,
-            df.date, df.site_expected_daily, df.site_available_daily,
-            df.site_reliability_daily, df.species_expected_daily,
-            df.species_available_daily, df.species_reliability_daily
-        FROM historical_df AS df
-        JOIN sites AS s ON s.site_code = df.site_code
-    ''')
+    #Insert only unique sites into the site table and insert measurements into the measurements table
+    with open(sql, "r") as file:
+        conn.execute(file.read())
 
     conn.close()
     print("Historical data loaded successfully.")
