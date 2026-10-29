@@ -16,11 +16,12 @@ def fetch_latest_data():
 
     conn = duckdb.connect(f'{folderloc}/air_quality.db')
 
-    #Fetch the latest data for the last 8 days from the measurements table
+    #Fetch the latest data for the last 8 days from the measurements table and join with site information to get the site code
     latest_df = conn.execute(f"""
-    SELECT *
-    FROM measurements
-    WHERE date >= '{start_date}' AND date <= '{end_date}'
+    SELECT s.site_code, m.timestamp, m.measurement
+    FROM measurements AS m
+    JOIN sites AS s ON m.site_id = s.id
+    WHERE m.date >= '{start_date}' AND m.date <= '{end_date}'
     """).fetchdf()
 
     conn.close()
@@ -72,6 +73,10 @@ def transform_data(latest_df):
     #site_available_daily_lag_1 column: The number of measurements that actually had values available yesterday.
     main_df["site_available_daily_lag_1"] = (main_df.groupby("site_code")["site_available_daily"].shift(1))
 
+    #Keep only yesterday's row for each site as the earlier days were only needed to calculate the lags
+    yesterday = pd.Timestamp(datetime.date.today() - datetime.timedelta(days=1))
+    main_df = main_df[main_df["date"] == yesterday].reset_index(drop=True)
+
     print(main_df.head(10))
 
     return main_df
@@ -82,18 +87,21 @@ def forecast_day(main_df):
     day_model = XGBRegressor()
     day_model.load_model(f"{folderloc}/xgboost_model_forecast_day.json")
 
-    #Define the features and target for the forecast model
-    features = ["site_code","day_of_the_week","site_reliability_lag_1",
+    #Define the features for the forecast model
+    features = ["site_code","day_of_the_week","site_reliability_daily","site_reliability_lag_1",
                 "site_reliability_lag_2","site_reliability_lag_3",
                 "site_reliability_rolling_mean_7","site_expected_daily_lag_1",
                 "site_available_daily_lag_1"]
-    target = "target_forecast_day"
 
     #Create a copy of the main_df so it avoids modifying the original DataFrame
     forecast_df = main_df.copy()
 
+    #One hot encode site_code, then match the model's training columns exactly
+    X = pd.get_dummies(forecast_df[features], columns=["site_code"], dtype=int)
+    X = X.reindex(columns=day_model.get_booster().feature_names, fill_value=0)
+
     #Add column for the forecasted target for the next day
-    forecast_df["target_forecast_day"] = day_model.predict(forecast_df[features])
+    forecast_df["target_forecast_day"] = day_model.predict(X)
 
     print(forecast_df.head(10))
 
@@ -105,14 +113,17 @@ def forecast_week(forecast_df, main_df):
     week_model = XGBRegressor()
     week_model.load_model(f"{folderloc}/xgboost_model_forecast_week.json")
 
-    features = ["site_code","day_of_the_week","site_reliability_lag_1",
+    features = ["site_code","day_of_the_week","site_reliability_daily", "site_reliability_lag_1",
                 "site_reliability_lag_2","site_reliability_lag_3",
                 "site_reliability_rolling_mean_7","site_expected_daily_lag_1",
                 "site_available_daily_lag_1"]
-    target = "target_forecast_week"
+
+    #One hot encode site_code, then match the model's training columns exactly
+    X_week = pd.get_dummies(forecast_df[features], columns=["site_code"], dtype=int)
+    X_week = X_week.reindex(columns=week_model.get_booster().feature_names, fill_value=0)
 
     #Add column for the forecasted target for the next week
-    forecast_df["target_forecast_week"] = week_model.predict(forecast_df[features])
+    forecast_df["target_forecast_week"] = week_model.predict(X_week)
 
     print(forecast_df.head(10))
 
@@ -124,6 +135,12 @@ def load_data(forecast_df):
     conn = duckdb.connect(f'{fileloc}/air_quality.db')
 
     conn.register("forecast_df", forecast_df)
+
+    #Remove today's and older forecasts first, so a rerun on the same day replaces today's rows
+    conn.execute('''
+        DELETE FROM forecasts
+        WHERE forecast_made_on <= CURRENT_DATE
+    ''')
 
     #Insert the forecasted data into the forecasts table and join with the sites table to get the site_id
     conn.execute('''
