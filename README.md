@@ -4,7 +4,7 @@
 > The DuckDB database file (`data/db/air_quality.db`) is larger than GitHub's 100 MB limit for a single file, so it is listed in `.gitignore` for now and will be added to the repository with Git LFS (Large File Storage).
 
 ### In progress
-- Add XGBoost and Notebook
+- Add XGBoost Notebook
 - Add `air_quality.db` database with Git LFS
 
 ### What I built and who for
