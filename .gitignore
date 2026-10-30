@@ -218,4 +218,5 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+.DS_Store
 data/db/air_quality.db
