@@ -2,7 +2,7 @@
 import datetime
 import pandas as pd
 import duckdb
-from xgboost import XGBRegressor
+import joblib
 
 def fetch_latest_data():
     #Fetch the last 8 days of data from duckdb database
@@ -76,10 +76,12 @@ def transform_data(latest_df):
     return main_df
 
 def forecast_day(main_df):
-    #Forecast the reliability for the next day based on the main_df using XGBoost model
+    #Forecast the reliability for the next day
     folderloc = "models/current"
-    day_model = XGBRegressor()
-    day_model.load_model(f"{folderloc}/xgboost_model_forecast_day.json")
+
+    #Load the pre-trained Linear Regression model and its features
+    day_model = joblib.load(f"{folderloc}/lr_model_forecast_day.pkl")
+    day_features = joblib.load(f"{folderloc}/lr_day_features.pkl")
 
     #Define the features for the forecast model
     features = ["site_code","day_of_the_week","site_reliability_daily","site_reliability_lag_1",
@@ -92,7 +94,7 @@ def forecast_day(main_df):
 
     #One hot encode site_code, then match the model's training columns exactly
     X = pd.get_dummies(forecast_df[features], columns=["site_code"], dtype=int)
-    X = X.reindex(columns=day_model.get_booster().feature_names, fill_value=0)
+    X = X.reindex(columns=day_features, fill_value=0)
 
     #Add column for the forecasted target for the next day
     forecast_df["target_forecast_day"] = day_model.predict(X)
@@ -100,10 +102,12 @@ def forecast_day(main_df):
     return forecast_df
 
 def forecast_week(forecast_df, main_df):
-    #Forecast the reliability for the next week based on the main_df using XGBoost model
+    #Forecast the reliability average for the next week
     folderloc = "models/current"
-    week_model = XGBRegressor()
-    week_model.load_model(f"{folderloc}/xgboost_model_forecast_week.json")
+
+    #Load the pre-trained Linear Regression model and its features
+    week_model = joblib.load(f"{folderloc}/lr_model_forecast_week.pkl")
+    week_features = joblib.load(f"{folderloc}/lr_week_features.pkl")
 
     features = ["site_code","day_of_the_week","site_reliability_daily", "site_reliability_lag_1",
                 "site_reliability_lag_2","site_reliability_lag_3",
@@ -112,7 +116,7 @@ def forecast_week(forecast_df, main_df):
 
     #One hot encode site_code, then match the model's training columns exactly
     X_week = pd.get_dummies(forecast_df[features], columns=["site_code"], dtype=int)
-    X_week = X_week.reindex(columns=week_model.get_booster().feature_names, fill_value=0)
+    X_week = X_week.reindex(columns=week_features, fill_value=0)
 
     #Add column for the forecasted target for the next week
     forecast_df["target_forecast_week"] = week_model.predict(X_week)
