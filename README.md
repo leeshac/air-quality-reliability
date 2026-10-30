@@ -5,7 +5,6 @@
 
 ### In progress
 - Add XGBoost Notebook
-- Add `air_quality.db` database with Git LFS
 
 ### What I built and who for
 This is an air quality site reliability dashboard and forecasting pipeline. It informs users how reliable each open monitoring site in London is at reporting measurements and provides a breakdown of reliability for the individual pollutants recorded at each site. The available data is up to date through the end of the previous day.
