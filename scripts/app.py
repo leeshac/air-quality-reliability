@@ -79,6 +79,8 @@ predictions_df = get_site_reliability_predictions(conn)
 raw_df = get_raw_data_preview(conn)
 trend_df = get_site_reliability_trend(conn)
 
+conn.close()
+
 #Create main dashboard and side panel for site details
 main_col, details_col = st.columns([1, 1])
 
@@ -219,22 +221,25 @@ with details_col:
 
             #Forecasts
             st.write("Forecasts")
+
+            if selected_predictions.empty:
+                st.warning("No forecast data available for the selected site.")
+            else:   
+                tomorrow = selected_predictions['forecast_tomorrow'].iloc[0]
+                next_seven_days = selected_predictions['forecast_next_seven_days_mean'].iloc[0]
                 
-            tomorrow = selected_predictions['forecast_tomorrow'].iloc[0]
-            next_seven_days = selected_predictions['forecast_next_seven_days_mean'].iloc[0]
+                left, forecast_col1, forecast_col2, right = st.columns([2, 2, 2, 1])
             
-            left, forecast_col1, forecast_col2, right = st.columns([2, 2, 2, 1])
-        
-            with forecast_col1:
-                st.metric(
-                    label="Tomorrow",
-                    value=f"{tomorrow:.0f}%",
-                    delta=f"{tomorrow - observed:.0f} pp")
-                
-            with forecast_col2:
-                st.metric(label="Next 7 days",
-                        value=f"{next_seven_days:.0f}%",
-                        delta=f"{next_seven_days - observed:.0f} pp")
+                with forecast_col1:
+                    st.metric(
+                        label="Tomorrow",
+                        value=f"{tomorrow:.0f}%",
+                        delta=f"{tomorrow - observed:.0f} pp")
+                    
+                with forecast_col2:
+                    st.metric(label="Next 7 days",
+                            value=f"{next_seven_days:.0f}%",
+                            delta=f"{next_seven_days - observed:.0f} pp")
 
             st.divider()
 

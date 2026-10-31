@@ -41,7 +41,6 @@ def transform_data(latest_df):
     main_df = (latest_df.groupby(["site_code", "date"], as_index=False).agg(site_expected_daily=("measurement", "size"),
                                                                             site_available_daily=("available", "sum")))
 
-
     #Calculate the daily site reliability
     main_df["site_reliability_daily"] = (main_df["site_available_daily"] / main_df["site_expected_daily"]) * 100
 
@@ -72,6 +71,10 @@ def transform_data(latest_df):
     #Keep only yesterday's row for each site as the earlier days were only needed to calculate the lags
     yesterday = pd.Timestamp(datetime.date.today() - datetime.timedelta(days=1))
     main_df = main_df[main_df["date"] == yesterday].reset_index(drop=True)
+
+    #Drop rows with any missing values in the feature columns as they are required for the forecast model
+    feature_cols = ["site_reliability_daily", "site_reliability_lag_1", "site_reliability_lag_2", "site_reliability_lag_3", "site_reliability_rolling_mean_7", "site_expected_daily_lag_1", "site_available_daily_lag_1"]
+    main_df = main_df.dropna(subset=feature_cols).reset_index(drop=True)
 
     return main_df
 
