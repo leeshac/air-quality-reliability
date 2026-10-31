@@ -60,7 +60,7 @@ def transform_data(latest_df):
     #site_reliability_mean_7 column: The average daily reliability over the previous 7 days.
     main_df["site_reliability_rolling_mean_7"] = main_df.groupby("site_code")["site_reliability_daily"].transform(lambda s: s.shift(1).rolling(window=7, min_periods=7).mean())
 
-    #Day of the week column
+    #Day of the week column, this is the day 2 days from the current date which is the forecast day or day one of the forecast horizon
     main_df["day_of_the_week"] = (main_df["date"] + pd.Timedelta(days=2)).dt.dayofweek
 
     #site_expected_daily_lag_1 column: The total number of measurements expected from that site yesterday.

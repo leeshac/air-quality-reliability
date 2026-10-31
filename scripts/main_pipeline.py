@@ -28,7 +28,6 @@ def fetch_sites():
             active_sites[site['@SiteCode']] = site
     return active_sites
 
-
 def fetch_data(active_sites):
     #Fetch data from the Air Quality Network API, run for each active site for the current month.
     base_url = "https://api.erg.ic.ac.uk/AirQuality"

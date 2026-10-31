@@ -236,7 +236,8 @@ with details_col:
                         value=f"{next_seven_days:.0f}%",
                         delta=f"{next_seven_days - observed:.0f} pp")
 
-            
+            st.divider()
+
 st.markdown("&nbsp;")
 
 st.markdown("<h3 style='text-align: center;'>Raw Data Preview</h3>", unsafe_allow_html=True)

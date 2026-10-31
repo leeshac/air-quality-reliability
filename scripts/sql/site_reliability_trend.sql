@@ -3,7 +3,7 @@ SELECT
 s.id AS site_id,
 s.site_name,
 m.date,
-AVG(m.site_reliability_daily) AS site_reliability
+MODE(m.site_reliability_daily) AS site_reliability
 FROM measurements m
 JOIN sites s ON m.site_id = s.id
 
