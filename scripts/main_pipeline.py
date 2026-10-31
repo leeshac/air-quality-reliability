@@ -161,16 +161,22 @@ def load_data(df):
     with open(sites_sql, "r") as file:
         conn.execute(file.read())
 
+    #Get the max id from the measurements table before inserting new rows
     max_id_before = conn.execute("SELECT COALESCE(MAX(id), 0) FROM measurements").fetchone()[0]
   
     #Execute the SQL script to insert new rows into the measurements table, avoiding duplicates
     with open(measurements_sql, "r") as file:
         conn.execute(file.read())
 
+    #Using the max id from before, get the new rows added to the measurements table
     new_rows = conn.execute("SELECT * FROM measurements WHERE id > ?", [max_id_before]).df()
     print(f"Rows in current month's data: {len(df)}")
     print(f"New rows added to the database: {len(new_rows)}")
     print(f"Duplicates skipped: {len(df) - len(new_rows)}")
+    #If new rows were added, print those rows
+    if not new_rows.empty:
+        print("New rows added:")
+        print(new_rows)
     
     conn.close()
     print("Data loaded successfully.")
