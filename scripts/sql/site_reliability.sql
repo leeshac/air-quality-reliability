@@ -1,8 +1,8 @@
 SELECT
 s.id AS site_id,
 s.site_name,
--- Get the maximum site reliability for each site
-MAX(m.site_reliability_daily) AS site_reliability_daily
+-- Get the most frequent site reliability for each site
+MODE(m.site_reliability_daily) AS site_reliability_daily
 FROM measurements m
 JOIN sites s ON m.site_id = s.id
 -- Only include measurements from the previous day
