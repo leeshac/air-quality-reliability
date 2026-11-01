@@ -100,7 +100,7 @@ def forecast_day(main_df):
     X = X.reindex(columns=day_features, fill_value=0)
 
     #Add column for the forecasted target for the next day
-    forecast_df["target_forecast_day"] = day_model.predict(X)
+    forecast_df["target_forecast_day"] = day_model.predict(X).clip(0, 100)
 
     return forecast_df
 
@@ -122,7 +122,7 @@ def forecast_week(forecast_df, main_df):
     X_week = X_week.reindex(columns=week_features, fill_value=0)
 
     #Add column for the forecasted target for the next week
-    forecast_df["target_forecast_week"] = week_model.predict(X_week)
+    forecast_df["target_forecast_week"] = week_model.predict(X_week).clip(0, 100)
 
     print(forecast_df.head(10))
 
