@@ -29,7 +29,52 @@ Historical data is collected to analyse measurement availability and calculate t
 `predictions.py`: Also designed to run once a day, immediately after main_pipeline.py. Updates the forecasts table in the database with newly generated forecasts for every site.
 
 ### How to run it
-TBA
+
+First, clone the repository:
+
+```bash
+git clone https://github.com/leeshac/air-quality-reliability.git
+```
+
+Install the required dependencies using `requirements.txt`:
+
+```bash
+pip install -r requirements.txt
+```
+
+The scripts should then be run in the following order:
+
+1. **`database.py`**: Run once to create the DuckDB database and its tables.
+
+   ```bash
+   python scripts/database.py
+   ```
+
+2. **`history_pipeline.py`**: Run once to collect historical data from January to September 2026 and populate the database. If running this for the first time at a later date, update the month range in the script to include all completed months up to the previous month.
+
+   ```bash
+   python scripts/history_pipeline.py
+   ```
+
+3. **`main_pipeline.py`**: Designed to run daily at midnight, collecting measurements up to the end of the previous day and adding new records to the database. It can also be run multiple times a day without inserting duplicate records.
+
+   ```bash
+   python scripts/main_pipeline.py
+   ```
+
+4. **`predictions.py`**: Ideally run immediately after `main_pipeline.py`, using the latest measurements in the database to generate updated forecasts for each site.
+
+   ```bash
+   python scripts/predictions.py
+   ```
+
+Once the database has been populated and the forecasts have been generated, the Streamlit dashboard can be launched using:
+
+```bash
+streamlit run scripts/app.py
+```
+
+The `database.py` and `history_pipeline.py` scripts only need to be run during the initial setup. After this, `main_pipeline.py` and `predictions.py` can be run daily to keep the measurements and forecasts up to date.
 
 ### What I would do next
 I would develop a retraining pipeline for the model, running once a month and retraining it on the latest month of data that was not included in the previous training run. This would allow the model to incorporate newer data over time and help prevent data drift.

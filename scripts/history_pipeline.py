@@ -29,7 +29,6 @@ def fetch_sites():
             active_sites[site['@SiteCode']] = site
     return active_sites
 
-
 def fetch_historical_data(active_sites):
     #For each site, fetch the historical data starting from january 2026 and stopping at september 2026.
     #Do this in batches of one month at a time, save the data in its raw form in data/api-data/raw/2026-01 [etc for each month].
@@ -50,6 +49,8 @@ def fetch_historical_data(active_sites):
         
         print(f"Fetching Site {code}")
 
+        #Iterate over each month from January to September 2026 for the current site
+        #If running at a later date, update the range to include the desired months
         for month in range(1,10):
             year = 2026
 
